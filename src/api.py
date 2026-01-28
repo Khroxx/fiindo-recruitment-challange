@@ -10,7 +10,7 @@ class ApiClient:
 
     def get(self, url: str, params: dict | None = None) -> dict:
         if params:
-            url = f"{url}?{urlendcode(params)}"
+            url = f"{url}?{urlencode(params)}"
 
         request = Request(url, headers=self.headers)
 

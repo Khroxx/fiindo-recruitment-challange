@@ -3,6 +3,12 @@ from config import API_BASE_URL, INDUSTRIES
 from api import ApiClient
 from collections import defaultdict
 from calculations import pe_ratio, revenue_growth, net_income_ttm, debt_ratio
+from sqlalchemy.orm import Session
+from sqlalchemy import func
+from db.session import SessionLocal
+from db.symbol_industry import SymbolIndustry
+from db.symbol_stats import SymbolStats
+from db.industry_aggregates import IndustryAggregates
 
 class DataFetcher:
     def __init__(self, client: ApiClient):
@@ -12,23 +18,6 @@ class DataFetcher:
         data = self.client.get(f"{API_BASE_URL}/api/v1/symbols")
         if isinstance(data, dict) and "symbols" in data:
             return data["symbols"]
-
-#    def fetch_symbols_by_industry(self, limit: int = 200) -> dict[str, list[str]]:
-#        symbols = self.fetch_symbols()[:limit]
-#
-#        symbols_by_industry = {}
-#
-#        for symbol in symbols:
-#            general = self.client.get(
-#                f"{API_BASE_URL}/api/v1/general/{symbol}"
-#            )
-#
-#            industry = general.get("industry")
-#
-#            if industry in INDUSTRIES:
-#                symbols_by_industry.setdefault(industry, []).append(symbol)
-#
-#        return symbols_by_industry
 
     def fetch_industry_data(self, symbol: str) -> dict:
         general = self.client.get(f"{API_BASE_URL}/api/v1/general/{symbol}")
@@ -49,40 +38,19 @@ class DataFetcher:
         }
 
 class ETL:
-    def __init__(self, fetcher):
-        self.fetcher = fetcher
+    def __init__(self, client: ApiClient):
+        self.client = client
 
-    def process_symbol(self, symbol: str) -> dict| None:
+    def process_symbol(self, symbol: str, industry: str) -> dict | None:
         try:
-            general = self.fetcher.client.get(f"{API_BASE_URL}/api/v1/general/{symbol}")
-            #print(symbol, general)
-
-            profile_data = (
-                general
-                .get("fundamentals", {})
-                .get("profile", {})
-                .get("data", [])
-            )
-            if not profile_data:
-                return None
-
-            industry = profile_data[0].get ("industry")
-            if industry not in INDUSTRIES:
-                return None
-
-            print(f"{symbol} → '{industry}'")
-
-            eod = self.fetcher.client.get(f"{API_BASE_URL}/api/v1/eod/{symbol}")
-            income = self.fetcher.client.get(f"{API_BASE_URL}/api/v1/financials/{symbol}/income")
-            balance = self.fetcher.client.get(f"{API_BASE_URL}/api/v1/financials/{symbol}/balance")
+            eod = self.client.get(f"{API_BASE_URL}/api/v1/eod/{symbol}")
+            income = self.client.get(f"{API_BASE_URL}/api/v1/financials/{symbol}/income")
+            balance = self.client.get(f"{API_BASE_URL}/api/v1/financials/{symbol}/balance")
 
             pe = pe_ratio(eod.get("close", 0), income.get("eps", 0))
             rev_growth = revenue_growth(income.get("revenue_q1", 0), income.get("revenue_q2", 0))
             net_ttm = net_income_ttm(income.get("net_income_quarters", []))
             debt_rat = debt_ratio(balance.get("total_debt", 0), balance.get("equity", 0))
-
-            #print(eod, income, balance)
-            #print(pe, rev_growth, net_ttm, debt_rat)
 
             return {
                 "symbol": symbol,
@@ -94,42 +62,56 @@ class ETL:
                 "debt_ratio": debt_rat,
             }
 
-        except HTTPError as e:
-            #print(f"Skipping {symbol} due to HTTP {e.code}")
-            return None
-
         except Exception as e:
-            #print(f"Skipping {symbol} due to error: {e}")
+            print(f"Skipping {symbol} due to error: {e}")
             return None
 
-    def run(self, limit: int = 14000) -> list[dict]:
-#        symbols = self.fetcher.fetch_symbols()[:limit]
-#        result = []
-#
-#        for index, symbol in enumerate(symbols, start=1):
-#            data = self.process_symbol(symbol)
-#            if data:
-#                result.append(data)
-#            if index % 50 == 0:
-#                print(f"Processed {index}/{len(symbols)} symbols", flush=True)
-#
-#       return result
-
-        symbols = self.fetcher.fetch_symbols()
-
-        for index, symbol in enumerate(symbols):
-            general = self.fetcher.client.get(f"{API_BASE_URL}/api/v1/general/{symbol}")
-
-            profile_data = (
-                general.get("fundamentals", {})
-                       .get("profile", {})
-                       .get("data", [])
+    def calculate_industry_aggregates(self):
+        session: Session = SessionLocal()
+        
+        session.query(IndustryAggregates).delete()
+        
+        industries = session.query(SymbolStats.industry).distinct().all()
+        
+        for (industry,) in industries:
+            stats = session.query(
+                func.avg(SymbolStats.pe_ratio).label('avg_pe'),
+                func.avg(SymbolStats.revenue_growth).label('avg_rev_growth'),
+                func.sum(SymbolStats.net_income_ttm).label('sum_revenue')
+            ).filter(SymbolStats.industry == industry).first()
+            
+            aggregate = IndustryAggregates(
+                industry=industry,
+                avg_pe_ratio=stats.avg_pe,
+                avg_revenue_growth=stats.avg_rev_growth,
+                sum_revenue=stats.sum_revenue
             )
+            session.add(aggregate)
+        
+        session.commit()
+        session.close()
+        print("Industry aggregates calculated")
 
-            if not profile_data:
-                continue
+    def run(self):
+        session: Session = SessionLocal()
+        symbols = session.query(SymbolIndustry).all()
+        results = []
 
-            industry = profile_data[0].get("industry")
+        for index, s in enumerate(symbols, 1):
+            data = self.process_symbol(s.symbol, s.industry)
+            if data:
+                results.append(data)
+                stat = SymbolStats(**data)
+                session.add(stat)
 
-            if industry in INDUSTRIES:
-                print(f"[{index}] {symbol} → {industry}")
+            if index % 20 == 0:
+                session.commit()
+                print(f"Processed {index}/{len(symbols)} symbols")
+
+        session.commit()
+        session.close()
+        print(f"ETL done: {len(results)} symbols processed")
+        
+        self.calculate_industry_aggregates()
+
+        return results

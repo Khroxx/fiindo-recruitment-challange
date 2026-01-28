@@ -19,6 +19,8 @@ if config.config_file_name is not None:
 from src.models import Base
 from src.db.symbol_stats import SymbolStats
 from src.db.symbol_industry import SymbolIndustry
+from src.db.industry_aggregates import IndustryAggregates
+
 #from src.db.industry_aggregates import IndustryAggregates
 target_metadata = Base.metadata
 

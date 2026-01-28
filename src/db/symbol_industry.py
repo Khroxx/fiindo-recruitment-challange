@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, String, UniqueConstraint
-from models import Base
+from src.models import Base
 
 class SymbolIndustry(Base):
     __tablename__ = "symbol_industries"
