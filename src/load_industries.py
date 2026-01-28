@@ -1,9 +1,9 @@
 from sqlalchemy.orm import Session
-from db.session import SessionLocal
-from db.symbol_industry import SymbolIndustry
-from data_fetcher import DataFetcher
-from config import INDUSTRIES, API_BASE_URL
-from api import ApiClient
+from src.db.session import SessionLocal
+from src.db.symbol_industry import SymbolIndustry
+from src.data_fetcher import DataFetcher
+from src.config import INDUSTRIES, API_BASE_URL
+from src.api import ApiClient
 
 def load_symbol_industries(limit: int):
     client = ApiClient(first_name="John", last_name="Doe")

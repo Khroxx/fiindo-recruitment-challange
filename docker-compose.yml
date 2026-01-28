@@ -1,0 +1,7 @@
+services:
+  etl:
+    build: .
+    volumes:
+      - ./fiindo_challenge.db:/app/fiindo_challenge.db
+    environment:
+      - PYTHONUNBUFFERED=1

@@ -1,7 +1,7 @@
-from api import ApiClient
-from data_fetcher import DataFetcher, ETL
-from config import API_BASE_URL
-from calculations import pe_ratio, revenue_growth, net_income_ttm, debt_ratio
+from src.api import ApiClient
+from src.data_fetcher import DataFetcher, ETL
+from src.config import API_BASE_URL
+from src.calculations import pe_ratio, revenue_growth, net_income_ttm, debt_ratio
 
 def main():
     client = ApiClient("Bari", "Sopa")
