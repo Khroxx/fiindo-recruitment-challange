@@ -17,6 +17,9 @@ if config.config_file_name is not None:
 # add your model's MetaData object here
 # for 'autogenerate' support
 from src.models import Base
+from src.db.symbol_stats import SymbolStats
+from src.db.symbol_industry import SymbolIndustry
+#from src.db.industry_aggregates import IndustryAggregates
 target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,
