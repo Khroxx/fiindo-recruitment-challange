@@ -7,7 +7,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-RUN alembic upgrade head && \
-    python -m src.load_industries
+RUN alembic upgrade head
 
 CMD ["python", "-m", "src.main"]
