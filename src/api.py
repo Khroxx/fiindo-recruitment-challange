@@ -1,6 +1,7 @@
 import json
 from urllib.request import Request, urlopen
 from urllib.parse import urlencode
+from urllib.error import HTTPError
 
 class ApiClient:
     def __init__(self, first_name: str, last_name: str):
@@ -14,5 +15,8 @@ class ApiClient:
 
         request = Request(url, headers=self.headers)
 
-        with urlopen(request) as response:
-            return json.loads(response.read().decode("utf-8"))
+        try:
+            with urlopen(request) as response:
+                return json.loads(response.read().decode("utf-8"))
+        except HTTPError as e:
+            raise

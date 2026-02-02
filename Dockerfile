@@ -7,6 +7,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-RUN alembic upgrade head
+RUN mkdir -p /app && \
+    chmod 777 /app && \
+    alembic upgrade head
 
 CMD ["python", "-m", "src.main"]
